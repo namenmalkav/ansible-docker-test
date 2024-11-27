@@ -1,0 +1,12 @@
+containers:
+  echo:
+    image: gcr.io/google_containers/echoserver:1.8
+    replicaCount: 2
+    port: 8080
+    path: /api
+  nginx:
+    image: nginx:latest
+    replicaCount: 2
+    port: 80
+    path: /statics
+    hashUrl: true

@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+{% for name, container in containers.items() %}
+{% for i in range(1, container.replicaCount +1 ) %}
+  {{ name }}{{ i }}:
+    image: {{ container.image }}
+    ports: 
+      - "{{ container.port }}"
+{% if container.hashUrl is defined and container.hashUrl %}
+    volumes:
+      - /opt/nginx{{ i }}/index.html:/usr/share/nginx/html/index.html
+{% endif %}
+{% endfor %}
+
+{% endfor %}
+
+  haproxy:
+    image: haproxy:3.0.3
+    ports:
+      - "80:80"
+    volumes:
+      - /opt/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+{% for name, container in containers.items() %}
+{% for i in range(1, container.replicaCount +1 ) %}
+      - {{ name }}{{ i }}
+{% endfor %}
+{% endfor %}

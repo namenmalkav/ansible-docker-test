@@ -1,0 +1,92 @@
+---
+- hosts: all
+# - hosts: localhost
+  # connection: local
+  become: true
+  vars_files:
+    - config.yaml
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Add Docker's GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+        state: present
+
+    - name: Install Docker and Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose
+        state: present
+
+    # Simulating deployment 
+    - name: Create Nginx directories
+      file:
+        path: "/opt/nginx{{ item }}"
+        state: directory
+        mode: '0755'
+      with_sequence: start=1 end={{ containers.nginx.replicaCount }}
+
+    - name: Create Nginx index.html files
+      copy:
+        content: "Response from Server {{ item }}"
+        dest: "/opt/nginx{{ item }}/index.html"
+        mode: '0644'
+      with_sequence: start=1 end={{ containers.nginx.replicaCount }}
+
+    ## Starting Deploy process
+    - name: Create directories for Docker Compose and configurations
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      with_items:
+        - /opt/app
+        - /opt/haproxy
+
+    - name: Generate docker-compose.yml
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: /opt/app/docker-compose.yml
+        mode: '0644'
+
+    - name: Generate HAProxy configuration
+      template:
+        src: templates/haproxy.cfg.j2
+        dest: /opt/haproxy/haproxy.cfg
+        mode: '0644'
+
+    - name: Start Docker Compose services
+      shell: |
+        docker-compose -f /opt/app/docker-compose.yml up -d --force-recreate
+      args:
+        chdir: /opt/app
+
+    # It can be used as a mode if more control is needed but this will require more packages to be installed
+    # - name: Start Docker Compose services
+    #   docker_compose:
+    #     project_src: /opt/app
+    #     state: present
+    #     restarted: true
+
+

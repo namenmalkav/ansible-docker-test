@@ -1,0 +1,32 @@
+global
+    maxconn 256
+
+defaults
+    mode http
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http-in
+    bind *:80
+{% for name, container in containers.items() %}
+    acl is_{{ name }} path_beg {{ container.path }}
+    use_backend {{ name }} if is_{{ name }}
+{% if container.hashUrl is defined and container.hashUrl %}
+    default_backend {{ name }}
+{% endif %}
+{% endfor %}
+
+{% for name, container in containers.items() %}
+backend {{ name }}
+    http-request set-path "%[path,regsub(^{{ container.path }},/)]"
+{% if container.hashUrl is defined and container.hashUrl %}
+    balance uri
+    hash-type consistent
+{% else %}
+    balance roundrobin
+{% endif %}
+{% for i in range(1, container.replicaCount+1) %}
+    server {{ name }}{{ i }} {{ name }}{{ i }}:{{ container.port }} check
+{% endfor %}
+{% endfor %}
